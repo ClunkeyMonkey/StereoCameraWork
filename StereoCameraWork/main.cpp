@@ -1,285 +1,84 @@
-#include <opencv2/opencv.hpp>
+#include <opencv2\opencv.hpp>
 #include <cmath>
+#include "undistortor.h"
 
-using namespace std;
-using namespace cv;
-
-float E(int x, int y, float d, Mat *left, Mat* right);
-float E_data(int x, int y, int d, Mat *left, Mat* right);
-float E_smooth(int x, int y, int d, Mat *left, Mat* right);
+cv::RNG rng(cv::getTickCount());
 
 int main() {
-	Mat input1, left1, right1, input2, left2, right2, disp1;
+	cv::Mat A, A_Left, A_Right;
+	cv::Mat B, B_Left, B_Right;
+	cv::Mat A_Disp_16S, A_Disp_8U;
+	cv::Mat B_Disp_16S, B_Disp_8U;
 
-	// Kurt		Room	Wall
-	input1 = imread("Wall.jpg", CV_LOAD_IMAGE_COLOR);
+	A = cv::imread("images/A.jpg", CV_LOAD_IMAGE_COLOR);
+	B = cv::imread("images/B.jpg", CV_LOAD_IMAGE_COLOR);
 
-	left1 = input1(Range::all(), Range(0, input1.cols / 2)).clone();
-	right1 = input1(Range::all(), Range(input1.cols / 2, input1.cols)).clone();
+	std::cout << "Images Opened" << std::endl;
 
-	//imshow("Input", input1);
-	//imshow("Left", left1);
-	//imshow("Right", right1);
+	A_Left = A(cv::Range::all(), cv::Range(0, A.cols / 2)).clone();
+	A_Right = A(cv::Range::all(), cv::Range(A.cols / 2, A.cols)).clone();
 
-	/*
-	VideoCapture camera1(0);// , camera2(2);
-	camera1 >> input1;
-	camera1 >> input1;
+	B_Left = B(cv::Range::all(), cv::Range(0, B.cols / 2)).clone();
+	B_Right = B(cv::Range::all(), cv::Range(B.cols / 2, B.cols)).clone();
 	
+	cv::imwrite("output/Split/A_Left.jpg", A_Left);
+	cv::imwrite("output/Split/A_Right.jpg", A_Right);
 
-	//camera2 >> input2;
-	//camera2 >> input2;
+	cv::imwrite("output/Split/B_Left.jpg", B_Left);
+	cv::imwrite("output/Split/B_Right.jpg", B_Right);
 
-	while (true) {
-		camera1 >> input1;
-		//camera2 >> input2;
-
-		left1 = input1(Range::all(), Range(0, input1.cols / 2)).clone();
-		right1 = input1(Range::all(), Range(input1.cols / 2, input1.cols)).clone();
-		//left2 = input2(Range::all(), Range(0, input2.cols / 2)).clone();
-		//right2 = input2(Range::all(), Range(input2.cols / 2, input2.cols)).clone();
-
-		if (!input1.empty()){
-			imshow("Camera1", input1);
-		}
-		if (!left1.empty()) {
-			imshow("Left1", left1);
-		}
-		if (!right1.empty()) {
-			imshow("Right1", right1);
-		}
-
-
-		/*if (!input2.empty()) {
-			imshow("Camera2", input2);
-		}
-		if (!left2.empty()) {
-			imshow("Left2", left2);
-		}
-		if (!right2.empty()) {
-			imshow("Right2", right2);
-		}*
-
-		if (waitKey(1) == 32) {
-			break;
-		}
-	}*/
+	std::cout << "Images Split" << std::endl;
 	
-	/*
-	//First Algorithm
+	un::undistortor leftD('L');
+	un::undistortor rightD('R');
 
-	Mat imgLeft1, imgRight1, imgLeft2, imgRight2;
+	leftD.fix(A_Left, &A_Left);
+	rightD.fix(A_Right, &A_Right);
 
-	cvtColor(left1, imgLeft1, COLOR_BGR2GRAY);
-	cvtColor(right1, imgRight1, COLOR_BGR2GRAY);
-	cvtColor(left1, imgRight2, COLOR_BGR2GRAY);
-	cvtColor(right1, imgLeft2, COLOR_BGR2GRAY);
-
-	//-- And create the image in which we will save our disparities
-	Mat imgDisparity16S1 = Mat(imgLeft1.rows, imgLeft1.cols, CV_16S);
-	Mat imgDisparity8U1 = Mat(imgLeft1.rows, imgLeft1.cols, CV_8UC1);
-	Mat imgDisparity16S2 = Mat(imgLeft2.rows, imgLeft2.cols, CV_16S);
-	Mat imgDisparity8U2 = Mat(imgLeft2.rows, imgLeft2.cols, CV_8UC1);
-
-	if (imgLeft1.empty() || imgRight1.empty() || imgLeft1.empty() || imgRight1.empty())
-	{ std::cout << " --(!) Error reading images" << std::endl; return -1; }
-
-	//-- 2. Call the constructor for StereoBM
-	int ndisparities = 16 * 5;
-	int SADWindowSize = 5;
-	Ptr<StereoBM> sbm1 = StereoBM::create(ndisparities, SADWindowSize);
-	Ptr<StereoBM> sbm2 = StereoBM::create(ndisparities, SADWindowSize);
-
-	//while (waitKey(1) != 27) {
-		//Refined Settings for first algorithm
-
-		sbm1->setDisp12MaxDiff(1);
-		sbm1->setSpeckleRange(8);
-		sbm1->setSpeckleWindowSize(0);
-		sbm1->setUniquenessRatio(0);
-		sbm1->setTextureThreshold(507);
-		sbm1->setMinDisparity(-39);
-		sbm1->setPreFilterCap(61);
-		sbm1->setPreFilterSize(5);
-		sbm2->setDisp12MaxDiff(1);
-		sbm2->setSpeckleRange(8);
-		sbm2->setSpeckleWindowSize(0);
-		sbm2->setUniquenessRatio(0);
-		sbm2->setTextureThreshold(507);
-		sbm2->setMinDisparity(-39);
-		sbm2->setPreFilterCap(61);
-		sbm2->setPreFilterSize(5);
-
-		//-- 3. Calculate the disparity image
-		sbm1->compute(imgLeft1, imgRight1, imgDisparity16S1);
-		sbm2->compute(imgLeft2, imgRight2, imgDisparity16S2);
-
-		//-- 4. Display it as a CV_8UC1 image
-		imgDisparity16S1.convertTo(imgDisparity8U1, CV_8UC1);
-		imgDisparity16S2.convertTo(imgDisparity8U2, CV_8UC1);
-
-		//namedWindow("windowDisparity", WINDOW_NORMAL);
-		imwrite("FinalMap_LonR.jpg", imgDisparity8U1);
-		imwrite("FinalMap_RonL.jpg", imgDisparity8U2);
-		imwrite("Difference_L-R.jpg", imgDisparity8U1 - imgDisparity8U2);
-		imwrite("Difference_R-L.jpg", imgDisparity8U2 - imgDisparity8U1);
-	//}*/
-
-	/*
-	//Subtraction Checking
-
-	Mat Difference1 = imgDisparity8U1 - imgDisparity8U2;
-	Mat Difference2 = imgDisparity8U2 - imgDisparity8U1;
-
-	imwrite("Diff1-2.jpg", Difference1);
-	imwrite("Diff2-1.jpg", Difference2);
-	*/
-
-	/*
-	//Point Confirmation with two passes
-	int threshold = 100;
-	Point place;
-	Mat check = Mat(imgDisparity8U1.rows, imgDisparity8U1.cols, CV_8UC1, Scalar(0));
-	for (int col = 0; col < imgDisparity8U1.cols; col++) {
-		for (int row = 0; row < imgDisparity8U1.rows; row++) {
-			place.x = col;
-			place.y = row;
-			if ((imgDisparity8U1.at<uchar>(place) > 0) && (imgDisparity8U2.at<uchar>(place) > 0)) {
-				if (abs(imgDisparity8U1.at<uchar>(place) - imgDisparity8U2.at<uchar>(place)) < threshold) {
-					check.at<uchar>(place) = imgDisparity8U1.at<uchar>(place);
-				}
-			}
-		}
-	}
-	imwrite("check.jpg", check);
-	*/
-
-	/*
-	//Second Algorithm
+	std::cout << "A Corrected" << std::endl;
 	
-	Mat left_img1, right_img1, left_img2, right_img2;
+	cv::imwrite("output/Corrected/A_Left.jpg", A_Left);
+	cv::imwrite("output/Corrected/A_Right.jpg", A_Right);
 
-	cvtColor(left1, left_img1, COLOR_BGR2GRAY);
-	cvtColor(right1, right_img1, COLOR_BGR2GRAY);
-	cvtColor(left1, right_img2, COLOR_BGR2GRAY);
-	cvtColor(right1, left_img2, COLOR_BGR2GRAY);
+	leftD.fix(B_Left, &B_Left);
+	rightD.fix(B_Right, &B_Right);
 
-    int disparity_max = 64;
+	std::cout << "B Corrected" << std::endl;
 
-    std::vector<cv::Mat> cost_maps1, cost_maps2;
+	cv::imwrite("output/Corrected/B_Left.jpg", B_Left);
+	cv::imwrite("output/Corrected/B_Right.jpg", B_Right);
+
+	A_Disp_16S = cv::Mat(A_Left.rows, A_Left.cols, CV_16S);
+	A_Disp_8U = cv::Mat(A_Left.rows, A_Left.cols, CV_8UC1);
+
+	B_Disp_16S = cv::Mat(B_Left.rows, B_Left.cols, CV_16S);
+	B_Disp_8U = cv::Mat(B_Left.rows, B_Left.cols, CV_8UC1);
+
+	int minDisparity = 0, numDisparities = 16 * 10, SADWindowSize = 5;
+
+	cv::Ptr<cv::StereoSGBM> sgbm = cv::StereoSGBM::create(minDisparity, numDisparities, SADWindowSize, 8 * A_Left.channels() * SADWindowSize * SADWindowSize, 32 * A_Left.channels() * SADWindowSize * SADWindowSize, floor(sqrt(numDisparities)), 0, 9, 200, 2);
+
+	std::cout << "Calculating Disparity of A" << std::endl;
+
+	sgbm->compute(A_Left, A_Right, A_Disp_16S);
+	A_Disp_16S = A_Disp_16S / 16;
+	A_Disp_16S.convertTo(A_Disp_8U, CV_8UC1);
+
+	cv::imwrite("output/DisparityMaps/A_Disp.jpg", A_Disp_8U);
 	
-	//left on right
-    for (int disparity = 0; disparity < disparity_max; disparity++){
-        cv::Mat cost_map = cv::Mat(left_img1.size().height, left_img1.size().width, CV_8UC1);
-        for (int row = 0; row < left_img1.size().height; row++){
-            for (int col = 0; col < left_img1.size().width; col++){
-                int col_disp = (col - disparity < 0) ? 0 : col - disparity;
-                            //Absolute Difference
-                cost_map.at<uchar>(row, col) = abs(left_img1.at<uchar>(row, col) - right_img1.at<uchar>(row, col_disp));
-            }
-        }
-        cost_maps1.push_back(cost_map);
-    }
-	
-	for (int disparity = 0; disparity < disparity_max; disparity++) {
-		cv::Mat cost_map = cv::Mat(left_img2.size().height, left_img2.size().width, CV_8UC1);
-		for (int row = 0; row < left_img2.size().height; row++) {
-			for (int col = 0; col < left_img2.size().width; col++) {
-				int col_disp = (col - disparity < 0) ? 0 : col - disparity;
-				//Absolute Difference
-				cost_map.at<uchar>(row, col) = abs(left_img2.at<uchar>(row, col) - right_img2.at<uchar>(row, col_disp));
-			}
-		}
-		cost_maps2.push_back(cost_map);
-	}
+	std::cout << "A_Disp completed" << std::endl;
 
-    //Pick the smallest disparity
-    cv::Mat final_cost_map1 = cv::Mat(left_img1.size().height, left_img1.size().width, CV_8UC1);
-    for (int row = 0; row < final_cost_map1.size().height; row++){
-        for (int col = 0; col < final_cost_map1.size().width; col++){
+	std::cout << "Calculating Disparity of B" << std::endl;
 
-            int min = 65536;
-            for (int disparity = 0; disparity < disparity_max; disparity++){
-                min = (cost_maps1[disparity].at<uchar>(row, col) < min ? cost_maps1[disparity].at<uchar>(row, col) : min);
-            }
+	sgbm->compute(B_Left, B_Right, B_Disp_16S);
+	B_Disp_16S = B_Disp_16S / 16;
+	B_Disp_16S.convertTo(B_Disp_8U, CV_8UC1);
 
-            final_cost_map1.at<uchar>(row, col) = min;
-        }
-    }
-	
-	cv::Mat final_cost_map2 = cv::Mat(left_img2.size().height, left_img2.size().width, CV_8UC1);
-	for (int row = 0; row < final_cost_map2.size().height; row++) {
-		for (int col = 0; col < final_cost_map2.size().width; col++) {
+	cv::imwrite("output/DisparityMaps/B_Disp.jpg", B_Disp_8U);
 
-			int min = 65536;
-			for (int disparity = 0; disparity < disparity_max; disparity++) {
-				min = (cost_maps2[disparity].at<uchar>(row, col) < min ? cost_maps2[disparity].at<uchar>(row, col) : min);
-			}
+	std::cout << "B_Disp completed" << std::endl;
 
-			final_cost_map2.at<uchar>(row, col) = min;
-		}
-	}
-	
-
-    //Show the final cost map, multiplied by 32 to show pixels with low value
-    imwrite("FinalMap_LonR.jpg", final_cost_map1);
-	imwrite("FinalMap_RonL.jpg", final_cost_map2);
-	imwrite("Subtraction_L-R.jpg", final_cost_map1 - final_cost_map2);
-	imwrite("Subtraction_R-L.jpg", final_cost_map2 - final_cost_map1);
-	*/
-	waitKey(0);
-
-	destroyAllWindows();
-	//camera1.release();
-	//camera2.release();
+	std::system("PAUSE");
+	cv::destroyAllWindows();
 	return 0;
-}
-
-void map_mrf(Mat *left, Mat* right) {
-	float data = 0;
-	float smooth = 0;
-	float lambda = 1;
-	float f = 3.6;
-	float l = 60.0;
-	float disp = 1;
-	int x = 0;
-	int y = 0;
-	Point leftPt = { x, y };
-	float d = (f * l) / disp;	//Not sure how disparity is found yet
-	float val = 0.0;
-	
-	val = E(x, y, d, left, right);
-}
-
-float E(int x, int y, float d, Mat *left, Mat* right) {
-	float ans = 0.0;
-	float lambda_smooth = 1.0;	//Addaptively defined by discontinuity regions, will need to look into this
-
-	ans = E_data(x, y, d, left, right) + lambda_smooth * E_smooth(x, y, d, left, right);
-
-	return ans;
-}
-
-float E_data(int x, int y, int d, Mat *left, Mat* right) {
-	float ans = 0.0;
-	Point lPt;
-	lPt.x = x;
-	lPt.y = y;
-
-	ans = abs(left->at<uchar>(lPt) - 0);	//'0' needs to be replaced by a large equation set. Will need to decode this later
-
-	return ans;
-}
-
-float E_smooth(int x, int y, int d, Mat *left, Mat* right) {
-	float ans = 0.0;
-	int offset = 1;
-
-	for (int i = x - offset; i <= x + offset; i++) {
-		for (int j = y - offset; j <= y + offset; j++) {
-
-		}
-	}
-
-	return ans;
 }

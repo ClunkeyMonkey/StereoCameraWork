@@ -18,15 +18,20 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="undistortor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Room.jpg">
+    <ClInclude Include="undistortor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="images\A.jpg">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Wall.jpg">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="Kurt.jpg">
+    <Image Include="images\B.jpg">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

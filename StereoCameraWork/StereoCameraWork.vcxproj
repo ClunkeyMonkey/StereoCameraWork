@@ -142,11 +142,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="undistortor.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Kurt.jpg" />
-    <Image Include="Room.jpg" />
-    <Image Include="Wall.jpg" />
+    <ClInclude Include="undistortor.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="images\A.jpg" />
+    <Image Include="images\B.jpg" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
